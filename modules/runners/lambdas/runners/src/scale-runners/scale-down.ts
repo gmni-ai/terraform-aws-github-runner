@@ -9,6 +9,9 @@ import { ScalingDownConfig, getIdleRunnerCount } from './scale-down-config';
 
 const logger = rootLogger.getChildLogger({ name: 'scale-down' });
 
+// Global variables are accessible by all lambda functions
+const runnerLastBusy: Map<string, moment.Moment> = new Map();
+
 async function getOrCreateOctokit(runner: RunnerInfo): Promise<Octokit> {
   const key = runner.owner;
   const cachedOctokit = githubCache.clients.get(key);
@@ -60,12 +63,28 @@ async function getGitHubRunnerBusyState(client: Octokit, ec2runner: RunnerInfo, 
           repo: ec2runner.owner.split('/')[1],
         });
 
+  const now = moment(new Date()).utc();
+  if (state.data.busy) {
+    runnerLastBusy.set(ec2runner.instanceId, now);
+  }
+  const lastBusy = runnerLastBusy.get(ec2runner.instanceId);
+  if (!lastBusy) {
+    return false;
+  }
+  const minimumRunningTimeInMinutes = process.env.MINIMUM_RUNNING_TIME_IN_MINUTES;
+  const lastBusyPlusMinimum = lastBusy.utc().add(minimumRunningTimeInMinutes, 'minutes');
   logger.info(
-    `Runner '${ec2runner.instanceId}' - GitHub Runner ID '${runnerId}' - Busy: ${state.data.busy}`,
+    `Runner '${ec2runner.instanceId}'
+      - GitHub Runner ID '${runnerId}'
+      - Now: ${now}
+      - Now v2: ${moment()}
+      - Busy: ${state.data.busy}
+      - Last Busy At ${lastBusy}
+      - In Idle Cooldown ${lastBusyPlusMinimum > now}
+    `,
     LogFields.print(),
   );
-
-  return state.data.busy;
+  return state.data.busy || lastBusyPlusMinimum > now;
 }
 
 async function listGitHubRunners(runner: RunnerInfo): Promise<GhRunners> {
