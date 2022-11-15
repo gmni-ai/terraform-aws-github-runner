@@ -63,7 +63,7 @@ async function getGitHubRunnerBusyState(client: Octokit, ec2runner: RunnerInfo, 
           repo: ec2runner.owner.split('/')[1],
         });
 
-  const now = moment(new Date()).utc();
+  const now = moment();
   if (state.data.busy) {
     runnerLastBusy.set(ec2runner.instanceId, now);
   }
@@ -77,7 +77,6 @@ async function getGitHubRunnerBusyState(client: Octokit, ec2runner: RunnerInfo, 
     `Runner '${ec2runner.instanceId}'
       - GitHub Runner ID '${runnerId}'
       - Now: ${now}
-      - Now v2: ${moment()}
       - Busy: ${state.data.busy}
       - Last Busy At ${lastBusy}
       - In Idle Cooldown ${lastBusyPlusMinimum > now}
@@ -116,14 +115,14 @@ async function listGitHubRunners(runner: RunnerInfo): Promise<GhRunners> {
 function runnerMinimumTimeExceeded(runner: RunnerInfo): boolean {
   const minimumRunningTimeInMinutes = process.env.MINIMUM_RUNNING_TIME_IN_MINUTES;
   const launchTimePlusMinimum = moment(runner.launchTime).utc().add(minimumRunningTimeInMinutes, 'minutes');
-  const now = moment(new Date()).utc();
+  const now = moment();
   return launchTimePlusMinimum < now;
 }
 
 function bootTimeExceeded(ec2Runner: RunnerInfo): boolean {
   const runnerBootTimeInMinutes = process.env.RUNNER_BOOT_TIME_IN_MINUTES;
   const launchTimePlusBootTime = moment(ec2Runner.launchTime).utc().add(runnerBootTimeInMinutes, 'minutes');
-  return launchTimePlusBootTime < moment(new Date()).utc();
+  return launchTimePlusBootTime < moment();
 }
 
 async function removeRunner(ec2runner: RunnerInfo, ghRunnerIds: number[]): Promise<void> {
